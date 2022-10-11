@@ -106,10 +106,11 @@ def findAc(text, phrase):
 async def avatar(
     interaction: nextcord.Interaction,
     users: str = nextcord.SlashOption(
-        description="type one or more names separated by spaces"
+        description="type one or more names (can be @mentions) separated by spaces"
     ),
 ):
     names = users.split(" ")
+    names = [i for i in names if i != '']
     print(names)
     for name in names:
         member: nextcord.Member = await get_member(interaction, name)
