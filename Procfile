@@ -1,1 +1,1 @@
-worker: py smirkcat.py
+worker: python smirkcat.py
