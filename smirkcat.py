@@ -135,14 +135,14 @@ async def avatar(
 async def get_member(ctx, name):
     m = None
     async for member in ctx.guild.fetch_members(limit=None):
-        if not member.bot:
-            if (
-                member.nick
-                and name.lower() in member.nick.lower()
-                or name.lower() in member.name.lower()
-            ):
-                m = member
-                break
+        if (
+            member.nick
+            and name.lower() in member.nick.lower()
+            or name.lower() in member.name.lower()
+            or name == member.mention
+        ):
+            m = member
+            break
     return m
 
 
