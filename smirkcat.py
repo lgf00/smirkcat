@@ -118,7 +118,7 @@ async def avatar(
             embed = nextcord.Embed()
             embed.color = nextcord.Color.from_rgb(114, 137, 218)
             embed.title = str(member)
-            if random.random() <= 1:
+            if random.random() <= 0.2:
                 embed.description = f"**[Avatar URL]({await get_pfp()})**"
                 file = nextcord.File("pfp.png", filename="pfp.png")
                 embed.set_image(url="attachment://pfp.png")
