@@ -2,7 +2,6 @@ import random
 import time
 import nextcord
 from nextcord.ext import commands
-# from config import TOKEN
 from dotenv import load_dotenv
 import re
 import requests
@@ -14,6 +13,7 @@ load_dotenv()
 GUILDS = [753006002533564596, 792880922525040670]
 bot = commands.Bot(intents=nextcord.Intents.all())
 bot.lick_timer = 0
+bot.breeze_timer = 0
 bot.prev_ym = ""
 
 
@@ -41,10 +41,11 @@ async def on_message(mes: nextcord.Message):
             print("contains your mom")
             ac = findAc(mes.content.lower(), "yourmom")
             await mes.channel.send(ac)
-        else:
-            for trigger in ["feet", "foot", "toes", "toe"]:
-                if f" {trigger} " in f" {mes.content.lower()} ":
-                    await feet(mes, trigger)
+        for trigger in ["feet", "foot", "toes", "toe"]:
+            if f" {trigger} " in f" {mes.content.lower()} ":
+                await feet(mes, trigger)
+        if "breeze" in mes.content.lower():
+            await breeze(mes)
 
 
 async def feet(message, word):
@@ -62,6 +63,19 @@ async def feet(message, word):
             "*** {0} not enough time passed: {1}s ***".format(
                 word.upper(), int(elapsed)
             ),
+        )
+
+
+async def breeze(message):
+    print(message.guild, "BREEZE...", message.content)
+    elapsed = time.time() - bot.breeze_timer
+    if elapsed > 259200:
+        await message.channel.send("breeze isn't even that big guys")
+        bot.breeze_timer = time.time()
+    else:
+        print(
+            message.guild,
+            "*** BREEZE not enough time passed: {0}s ***".format(int(elapsed)),
         )
 
 
