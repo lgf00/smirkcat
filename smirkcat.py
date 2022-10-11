@@ -16,7 +16,7 @@ bot.prev_ym = ""
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    await bot.change_presence(activity=nextcord.Game('with your mom'))
+    await bot.change_presence(activity=nextcord.Game("with your mom"))
     for guild in bot.guilds:
         await guild.me.edit(nick="Meow Meow 🙀")
         print("### LOGGED IN AS {0.user}, guild: {1} ###".format(bot, guild))
@@ -31,7 +31,8 @@ async def on_message(mes: nextcord.Message):
     else:
         bot.prev_ym = mes.content
         if re.fullmatch(
-            "[\S\s]*y[\S\s]*o[\S\s]*u[\S\s]*r[\S\s]*m[\S\s]*o[\S\s]*m[\S\s]*", mes.content
+            "[\S\s]*y[\S\s]*o[\S\s]*u[\S\s]*r[\S\s]*m[\S\s]*o[\S\s]*m[\S\s]*",
+            mes.content,
         ):
             print("contains your mom")
             ac = findAc(mes.content.lower(), "yourmom")
@@ -98,7 +99,7 @@ async def avatar(
             embed = nextcord.Embed()
             embed.color = nextcord.Color.from_rgb(114, 137, 218)
             embed.title = str(member)
-            if (random.random() <= 0.1):
+            if random.random() <= 0.1:
                 embed.description = f"**[Avatar URL]({await get_pfp()})**"
                 file = nextcord.File("pfp.png", filename="pfp.png")
                 embed.set_image(url="attachment://pfp.png")
@@ -106,7 +107,7 @@ async def avatar(
             else:
                 embed.description = f"**[Avatar URL]({member.avatar.url})**"
                 embed.set_image(url=member.avatar.with_size(256).url)
-                await interaction.send(embed=embed)            
+                await interaction.send(embed=embed)
         else:
             print(f"{name} not found")
             await interaction.send(f"Could not find user with name: {name}")
@@ -133,20 +134,20 @@ async def get_pfp():
         "https://v2.yiff.rest/furry/bulge/image",
         headers={"User-Agent": 'Smirkcat/4.0.0 (lgf#5547; "Discord")'},
     )
-    if (r.status_code == 200):
+    if r.status_code == 200:
         open("pfp.png", "wb").write(r.content)
         old_im = Image.open("pfp.png")
-        old_im.thumbnail((256, 256))        
+        old_im.thumbnail((256, 256))
         old_size = old_im.size
 
         new_size = (256, 256)
-        new_im = Image.new("RGB", new_size)   # luckily, this is already black!
+        new_im = Image.new("RGB", new_size)  # luckily, this is already black!
         box = tuple((n - o) // 2 for n, o in zip(new_size, old_size))
         new_im.paste(old_im, box)
 
         new_im.save("pfp.png")
-        return(r.headers.get("x-yiffy-short-url"))
-    return(None)
+        return r.headers.get("x-yiffy-short-url")
+    return None
 
 
 bot.run(TOKEN)
