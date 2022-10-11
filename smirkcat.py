@@ -2,10 +2,14 @@ import random
 import time
 import nextcord
 from nextcord.ext import commands
-from config import TOKEN
+# from config import TOKEN
+from dotenv import load_dotenv
 import re
 import requests
 from PIL import Image
+import os
+
+load_dotenv()
 
 GUILDS = [753006002533564596, 792880922525040670]
 bot = commands.Bot(intents=nextcord.Intents.all())
@@ -150,4 +154,4 @@ async def get_pfp():
     return None
 
 
-bot.run(TOKEN)
+bot.run(os.environ['TOKEN'])
