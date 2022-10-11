@@ -7,7 +7,7 @@ import re
 import requests
 from PIL import Image
 
-GUILDS = [753006002533564596, 792880922525040670]
+GUILDS = [753006002533564596]
 bot = commands.Bot(intents=nextcord.Intents.all())
 bot.lick_timer = 0
 bot.prev_ym = ""
@@ -121,6 +121,7 @@ async def get_member(ctx, name):
                 member.nick
                 and name.lower() in member.nick.lower()
                 or name.lower() in member.name.lower()
+                or name in member.mention
             ):
                 m = member
                 break
