@@ -1,0 +1,6 @@
+random
+time
+nextcord
+re
+requests
+Pillow
