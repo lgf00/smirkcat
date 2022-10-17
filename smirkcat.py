@@ -13,7 +13,9 @@ load_dotenv()
 GUILDS = [753006002533564596, 792880922525040670]
 bot = commands.Bot(intents=nextcord.Intents.all())
 bot.lick_timer = 0
+bot.lick_max = 604800
 bot.breeze_timer = 0
+bot.breeze_max = 604800
 bot.prev_ym = ""
 
 
@@ -30,7 +32,11 @@ async def on_ready():
 async def on_message(mes: nextcord.Message):
     if mes.author == bot.user or mes.author.bot:
         return
-    if bot.prev_ym == mes.content or "your mom" in mes.content:
+    if (
+        bot.prev_ym == mes.content
+        or "your mom" in mes.content
+        or re.fullmatch("[\S\s]*\(y[\S\s]*m\)[\S\s]*", mes.content)
+    ):
         print("YM same or YM")
     else:
         bot.prev_ym = mes.content
@@ -51,7 +57,7 @@ async def on_message(mes: nextcord.Message):
 async def feet(message, word):
     print("FEET...", message.content)
     elapsed = time.time() - bot.lick_timer
-    if elapsed > 259200:
+    if elapsed > bot.lick_max:
         with open("lick.jpg", "rb") as f:
             picture = nextcord.File(f)
             await message.channel.send("Did someone say {}?".format(word))
@@ -69,7 +75,7 @@ async def feet(message, word):
 async def breeze(message):
     print(message.guild, "BREEZE...", message.content)
     elapsed = time.time() - bot.breeze_timer
-    if elapsed > 259200:
+    if elapsed > bot.breeze_max:
         await message.channel.send("breeze isn't even that big guys")
         bot.breeze_timer = time.time()
     else:
@@ -102,7 +108,9 @@ def findAc(text, phrase):
     ).replace(")(", "")
 
 
-@bot.slash_command(description="Displays a users avatar and is never wrong", guild_ids=GUILDS)
+@bot.slash_command(
+    description="Displays a users avatar and is never wrong", guild_ids=GUILDS
+)
 async def avatar(
     interaction: nextcord.Interaction,
     users: str = nextcord.SlashOption(
@@ -110,7 +118,7 @@ async def avatar(
     ),
 ):
     names = users.split(" ")
-    names = [i for i in names if i != '']
+    names = [i for i in names if i != ""]
     print(names)
     for name in names:
         member: nextcord.Member = await get_member(interaction, name)
@@ -169,4 +177,4 @@ async def get_pfp():
     return None
 
 
-bot.run(os.environ['TOKEN'])
+bot.run(os.environ["TOKEN"])
