@@ -16,7 +16,7 @@ bot.lick_timer = 0
 bot.lick_max = 604800
 bot.breeze_timer = 0
 bot.breeze_max = 604800
-bot.prev_ym = ""
+bot.prev_ym = []
 
 
 @bot.event
@@ -33,13 +33,15 @@ async def on_message(mes: nextcord.Message):
     if mes.author == bot.user or mes.author.bot:
         return
     if (
-        bot.prev_ym == mes.content
+        mes.content in bot.prev_ym
         or "your mom" in mes.content
         or re.fullmatch("[\S\s]*\(y[\S\s]*m\)[\S\s]*", mes.content)
     ):
         print("YM same or YM")
     else:
-        bot.prev_ym = mes.content
+        bot.prev_ym.append(mes.content)
+        if len(bot.prev_ym) > 5:
+            bot.prev_ym.pop(0)
         if re.fullmatch(
             "[\S\s]*y[\S\s]*o[\S\s]*u[\S\s]*r[\S\s]*m[\S\s]*o[\S\s]*m[\S\s]*",
             mes.content,
