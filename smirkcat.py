@@ -182,6 +182,8 @@ async def get_pfp():
 
 
 def getFuzzyRatio(mes):
+    if (len(bot.prev_ym) == 0):
+        return 0
     ratio = max([fuzz.ratio(mes, s) for s in bot.prev_ym])
     return ratio
 
