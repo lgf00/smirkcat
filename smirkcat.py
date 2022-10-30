@@ -7,6 +7,7 @@ import re
 import requests
 from PIL import Image
 import os
+from fuzzywuzzy import fuzz
 
 load_dotenv()
 
@@ -32,28 +33,29 @@ async def on_ready():
 async def on_message(mes: nextcord.Message):
     if mes.author == bot.user or mes.author.bot:
         return
+    message_oneline = mes.content.replace("\n", "").lower()
     if (
-        mes.content in bot.prev_ym
+        getFuzzyRatio(message_oneline) > 80
         or "your mom" in mes.content
-        or re.fullmatch("[\S\s]*\(y[\S\s]*m\)[\S\s]*", mes.content)
     ):
         print("YM same or YM")
     else:
-        bot.prev_ym.append(mes.content)
-        if len(bot.prev_ym) > 5:
+        if len(bot.prev_ym) > 10:
             bot.prev_ym.pop(0)
+        bot.prev_ym.append(message_oneline)
         if re.fullmatch(
-            "[\S\s]*y[\S\s]*o[\S\s]*u[\S\s]*r[\S\s]*m[\S\s]*o[\S\s]*m[\S\s]*",
+            "[\\S\\s]*y[\\S\\s]*o[\\S\\s]*u[\\S\\s]*r[\\S\\s]*m[\\S\\s]*o[\\S\\s]*m[\\S\\s]*",
             mes.content,
         ):
             print("contains your mom")
             ac = findAc(mes.content.lower(), "yourmom")
+            bot.prev_ym.append(ac)
             await mes.channel.send(ac)
-        for trigger in ["feet", "foot", "toes", "toe"]:
-            if f" {trigger} " in f" {mes.content.lower()} ":
-                await feet(mes, trigger)
-        if "breeze" in mes.content.lower():
-            await breeze(mes)
+    for trigger in ["feet", "foot", "toes", "toe"]:
+        if f" {trigger} " in f" {mes.content.lower()} ":
+            await feet(mes, trigger)
+    if "breeze" in mes.content.lower():
+        await breeze(mes)
 
 
 async def feet(message, word):
@@ -177,6 +179,11 @@ async def get_pfp():
         new_im.save("pfp.png")
         return r.headers.get("x-yiffy-short-url")
     return None
+
+
+def getFuzzyRatio(mes):
+    ratio = max([fuzz.ratio(mes, s) for s in bot.prev_ym])
+    return ratio
 
 
 bot.run(os.environ["TOKEN"])
