@@ -8,6 +8,7 @@ import requests
 from PIL import Image
 import os
 from fuzzywuzzy import fuzz
+from yt_dlp import YoutubeDL
 
 load_dotenv()
 
@@ -18,6 +19,9 @@ bot.lick_max = 604800
 bot.breeze_timer = 0
 bot.breeze_max = 604800
 bot.prev_ym = []
+
+tiktok = re.compile('([\\S\\s]*)(https:\\/\\/www.tiktok.com\\/t\\/[A-Za-z0-9]+\\/)([\\S\\s]*)')
+yourmom = re.compile('[\\S\\s]*y[\\S\\s]*o[\\S\\s]*u[\\S\\s]*r[\\S\\s]*m[\\S\\s]*o[\\S\\s]*m[\\S\\s]*')
 
 
 @bot.event
@@ -44,7 +48,7 @@ async def on_message(mes: nextcord.Message):
             bot.prev_ym.pop(0)
         bot.prev_ym.append(message_oneline)
         if re.fullmatch(
-            "[\\S\\s]*y[\\S\\s]*o[\\S\\s]*u[\\S\\s]*r[\\S\\s]*m[\\S\\s]*o[\\S\\s]*m[\\S\\s]*",
+            yourmom,
             mes.content,
         ):
             print("contains your mom")
@@ -56,6 +60,8 @@ async def on_message(mes: nextcord.Message):
             await feet(mes, trigger)
     if "breeze" in mes.content.lower():
         await breeze(mes)
+        if tiktok.fullmatch(mes.content):
+            await sendDownloadedTiktok(mes, tiktok.match(mes.content))
 
 
 async def feet(message, word):
@@ -186,6 +192,18 @@ def getFuzzyRatio(mes):
         return 0
     ratio = max([fuzz.ratio(mes, s) for s in bot.prev_ym])
     return ratio
+
+
+async def sendDownloadedTiktok(mes: nextcord.Message, match: re.Match):
+    async with mes.channel.typing():
+        yt_ops = {
+            'outtmpl': "./dltiktok.%(ext)s",
+            'format': "bv[vcodec=h264]+ba/w"
+        }
+        with YoutubeDL(yt_ops) as ydl:
+            ydl.download([match.group(2)])
+    await mes.reply(file=nextcord.File(r'./dltiktok.mp4'))
+    os.remove('./dltiktok.mp4')
 
 
 bot.run(os.environ["TOKEN"])
