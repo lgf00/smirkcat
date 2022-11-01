@@ -19,8 +19,7 @@ bot.lick_max = 604800
 bot.breeze_timer = 0
 bot.breeze_max = 604800
 bot.prev_ym = []
-
-tiktok = re.compile('([\\S\\s]*)(https:\\/\\/www.tiktok.com\\/t\\/[A-Za-z0-9]+\\/)([\\S\\s]*)')
+tiktok = re.compile('([\\S\\s]*)(https:\\/\\/[a-z]+.tiktok.com\\/[t\\/]*[A-Za-z0-9]+\\/)([\\S\\s]*)')
 yourmom = re.compile('[\\S\\s]*y[\\S\\s]*o[\\S\\s]*u[\\S\\s]*r[\\S\\s]*m[\\S\\s]*o[\\S\\s]*m[\\S\\s]*')
 
 
