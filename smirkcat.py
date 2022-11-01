@@ -60,8 +60,8 @@ async def on_message(mes: nextcord.Message):
             await feet(mes, trigger)
     if "breeze" in mes.content.lower():
         await breeze(mes)
-        if tiktok.fullmatch(mes.content):
-            await sendDownloadedTiktok(mes, tiktok.match(mes.content))
+    if tiktok.fullmatch(mes.content):
+        await sendDownloadedTiktok(mes, tiktok.match(mes.content))
 
 
 async def feet(message, word):
