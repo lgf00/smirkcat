@@ -9,6 +9,7 @@ from PIL import Image
 import os
 from fuzzywuzzy import fuzz
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
 load_dotenv()
 
@@ -60,6 +61,7 @@ async def on_message(mes: nextcord.Message):
     if "breeze" in mes.content.lower():
         await breeze(mes)
     if tiktok.fullmatch(mes.content):
+        print('tiktok found in message')
         await sendDownloadedTiktok(mes, tiktok.match(mes.content))
 
 
@@ -197,12 +199,15 @@ async def sendDownloadedTiktok(mes: nextcord.Message, match: re.Match):
     async with mes.channel.typing():
         yt_ops = {
             'outtmpl': "./dltiktok.%(ext)s",
-            'format': "bv[vcodec=h264]+ba/w"
+            'format': "bv[vcodec=h264]+ba/w+[format_id!=play_addr]"
         }
-        with YoutubeDL(yt_ops) as ydl:
-            ydl.download([match.group(2)])
-    await mes.reply(file=nextcord.File(r'./dltiktok.mp4'))
-    os.remove('./dltiktok.mp4')
-
+        try:
+            with YoutubeDL(yt_ops) as ydl:
+                ydl.download([match.group(2)])
+            await mes.reply(file=nextcord.File(r'./dltiktok.mp4'))
+            os.remove('./dltiktok.mp4')
+        except DownloadError:
+            print("download error, most likely slide show")
+            await mes.reply("slide show :nauseated_face:")
 
 bot.run(os.environ["TOKEN"])
