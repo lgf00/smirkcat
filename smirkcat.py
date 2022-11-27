@@ -20,8 +20,15 @@ bot.lick_max = 604800
 bot.breeze_timer = 0
 bot.breeze_max = 604800
 bot.prev_ym = []
-tiktok = re.compile('([\\S\\s]*)(https:\\/\\/[a-z]+.tiktok.com\\/[t\\/]*[A-Za-z0-9]+\\/)([\\S\\s]*)')
-yourmom = re.compile('[\\S\\s]*y[\\S\\s]*o[\\S\\s]*u[\\S\\s]*r[\\S\\s]*m[\\S\\s]*o[\\S\\s]*m[\\S\\s]*')
+tiktok = re.compile(
+    "([\\S\\s]*)(https:\\/\\/[a-z]+.tiktok.com\\/[t\\/]*[A-Za-z0-9]+\\/)([\\S\\s]*)"
+)
+yourmom = re.compile(
+    "[\\S\\s]*y[\\S\\s]*o[\\S\\s]*u[\\S\\s]*r[\\S\\s]*m[\\S\\s]*o[\\S\\s]*m[\\S\\s]*"
+)
+link = re.compile(
+    "^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)$"
+)
 
 
 @bot.event
@@ -38,30 +45,27 @@ async def on_message(mes: nextcord.Message):
     if mes.author == bot.user or mes.author.bot:
         return
     message_oneline = mes.content.replace("\n", "").lower()
-    if (
-        getFuzzyRatio(message_oneline) > 80
-        or "your mom" in mes.content
-    ):
+    if getFuzzyRatio(message_oneline) > 80 or "your mom" in mes.content:
         print("YM same or YM")
     else:
-        if len(bot.prev_ym) > 10:
-            bot.prev_ym.pop(0)
-        bot.prev_ym.append(message_oneline)
         if re.fullmatch(
             yourmom,
-            mes.content,
-        ):
+            message_oneline,
+        ) and not re.fullmatch(link, message_oneline):
+            if len(bot.prev_ym) > 10:
+                bot.prev_ym.pop(0)
+            bot.prev_ym.append(message_oneline)
             print("contains your mom")
             ac = findAc(mes.content.lower(), "yourmom")
             bot.prev_ym.append(ac)
             await mes.channel.send(ac)
     for trigger in ["feet", "foot", "toes", "toe"]:
-        if f" {trigger} " in f" {mes.content.lower()} ":
+        if f" {trigger} " in f" {message_oneline} ":
             await feet(mes, trigger)
-    if "breeze" in mes.content.lower():
+    if "breeze" in message_oneline:
         await breeze(mes)
     if tiktok.fullmatch(mes.content):
-        print('tiktok found in message')
+        print("tiktok found in message")
         await sendDownloadedTiktok(mes, tiktok.match(mes.content))
 
 
@@ -189,7 +193,7 @@ async def get_pfp():
 
 
 def getFuzzyRatio(mes):
-    if (len(bot.prev_ym) == 0):
+    if len(bot.prev_ym) == 0:
         return 0
     ratio = max([fuzz.ratio(mes, s) for s in bot.prev_ym])
     return ratio
@@ -198,16 +202,17 @@ def getFuzzyRatio(mes):
 async def sendDownloadedTiktok(mes: nextcord.Message, match: re.Match):
     async with mes.channel.typing():
         yt_ops = {
-            'outtmpl': "./dltiktok.%(ext)s",
-            'format': "bv[vcodec=h264]+ba/w+[format_id!=play_addr]"
+            "outtmpl": "./dltiktok.%(ext)s",
+            "format": "bv[vcodec=h264]+ba/w+[format_id!=play_addr]",
         }
         try:
             with YoutubeDL(yt_ops) as ydl:
                 ydl.download([match.group(2)])
-            await mes.reply(file=nextcord.File(r'./dltiktok.mp4'))
-            os.remove('./dltiktok.mp4')
+            await mes.reply(file=nextcord.File(r"./dltiktok.mp4"))
+            os.remove("./dltiktok.mp4")
         except DownloadError:
             print("download error, most likely slide show")
             await mes.reply("slide show :nauseated_face:")
+
 
 bot.run(os.environ["TOKEN"])
