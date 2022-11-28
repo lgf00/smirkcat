@@ -56,17 +56,21 @@ async def on_message(mes: nextcord.Message):
                 bot.prev_ym.pop(0)
             bot.prev_ym.append(message_oneline)
             print("contains your mom")
-            ac = findAc(mes.content.lower(), "yourmom")
-            bot.prev_ym.append(ac)
-            await mes.channel.send(ac)
+            async with mes.channel.typing():
+                ac = findAc(mes.content.lower(), "yourmom")
+                bot.prev_ym.append(ac)
+                await mes.channel.send(ac)
     for trigger in ["feet", "foot", "toes", "toe"]:
         if f" {trigger} " in f" {message_oneline} ":
-            await feet(mes, trigger)
+            async with mes.channel.typing():
+                await feet(mes, trigger)
     if "breeze" in message_oneline:
-        await breeze(mes)
+        async with mes.channel.typing():
+            await breeze(mes)
     if tiktok.fullmatch(mes.content):
         print("tiktok found in message")
-        await sendDownloadedTiktok(mes, tiktok.match(mes.content))
+        async with mes.channel.typing():
+            await sendDownloadedTiktok(mes, tiktok.match(mes.content).group(2))
 
 
 async def feet(message, word):
@@ -199,20 +203,22 @@ def getFuzzyRatio(mes):
     return ratio
 
 
-async def sendDownloadedTiktok(mes: nextcord.Message, match: re.Match):
-    async with mes.channel.typing():
-        yt_ops = {
-            "outtmpl": "./dltiktok.%(ext)s",
-            "format": "bv[vcodec=h264]+ba/w+[format_id!=play_addr]",
-        }
-        try:
-            with YoutubeDL(yt_ops) as ydl:
-                ydl.download([match.group(2)])
-            await mes.reply(file=nextcord.File(r"./dltiktok.mp4"))
-            os.remove("./dltiktok.mp4")
-        except DownloadError:
-            print("download error, most likely slide show")
-            await mes.reply("slide show :nauseated_face:")
+async def sendDownloadedTiktok(mes: nextcord.Message, link):
+    yt_ops = {
+        "outtmpl": "./dltiktok.%(ext)s",
+        "format": "bv[vcodec=h264]+ba/w+[format_id!=play_addr]",
+    }
+    try:
+        with YoutubeDL(yt_ops) as ydl:
+            if ('www' in link):
+                link = link.replace('www', 'vm')
+                print(link)
+            ydl.download(link)
+        await mes.reply(file=nextcord.File(r"./dltiktok.mp4"))
+        os.remove("./dltiktok.mp4")
+    except DownloadError:
+        print("download error, most likely slide show")
+        await mes.reply("slide show :nauseated_face:")
 
 
 bot.run(os.environ["TOKEN"])
