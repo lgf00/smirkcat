@@ -10,6 +10,7 @@ import os
 from fuzzywuzzy import fuzz
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
+import cv2
 
 load_dotenv()
 
@@ -126,6 +127,26 @@ def findAc(text, phrase):
         + " ".join(findAc(after, "".join(phrase)).split("( )"))
     ).replace(")(", "")
 
+
+@bot.slash_command(
+    description="Takes a picture of lucas at his desk", guild_ids=GUILDS
+)
+async def peekaboo(
+    interaction: nextcord.Interaction,
+):
+    await interaction.response.defer()
+    vid = cv2.VideoCapture(0)
+    time.sleep(5)
+    ret, frame = vid.read()
+
+    print(ret)
+    if ret:
+        cv2.imwrite("capture.jpg", frame)
+    vid.release()
+    cv2.destroyAllWindows()
+    with open('capture.jpg', 'rb') as f:
+        pic = nextcord.File(f)
+        await interaction.send(file=pic)
 
 @bot.slash_command(
     description="Displays a users avatar and is never wrong", guild_ids=GUILDS
