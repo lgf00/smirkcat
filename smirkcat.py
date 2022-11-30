@@ -11,6 +11,7 @@ from fuzzywuzzy import fuzz
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 import cv2
+import RPi.GPIO as GPIO
 
 load_dotenv()
 
@@ -30,7 +31,10 @@ yourmom = re.compile(
 link = re.compile(
     "^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)$"
 )
-
+bot.speed = 0.07
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(8, GPIO.OUT, initial=GPIO.LOW)
 
 @bot.event
 async def on_ready():
@@ -135,11 +139,21 @@ async def peekaboo(
     interaction: nextcord.Interaction,
 ):
     await interaction.response.defer()
+    print("peekaboo")
     vid = cv2.VideoCapture(0)
-    time.sleep(5)
-    ret, frame = vid.read()
+    l = 5 / (bot.speed * 2)
+    while l > 0:
+        GPIO.output(8, GPIO.HIGH)
+        time.sleep(bot.speed)
+        GPIO.output(8, GPIO.LOW)
+        time.sleep(bot.speed)
+        l -= 1
 
-    print(ret)
+    time.sleep(0.5)
+    GPIO.output(8, GPIO.HIGH)
+    ret, frame = vid.read()
+    GPIO.output(8, GPIO.LOW)
+
     if ret:
         cv2.imwrite("capture.jpg", frame)
     vid.release()

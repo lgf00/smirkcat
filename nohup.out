@@ -64,3 +64,109 @@ YM same or YM
 Logged in as Meow Meow 🙀#6007
 ### LOGGED IN AS Meow Meow 🙀#6007, guild: bot testing ###
 ### LOGGED IN AS Meow Meow 🙀#6007, guild: i had sex.. ###
+Logged in as Meow Meow 🙀#6007
+### LOGGED IN AS Meow Meow 🙀#6007, guild: bot testing ###
+### LOGGED IN AS Meow Meow 🙀#6007, guild: i had sex.. ###
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+  File "/home/ootami/dev/smirkcat/smirkcat.py", line 149
+    l -= 1
+TabError: inconsistent use of tabs and spaces in indentation
+  File "/home/ootami/dev/smirkcat/smirkcat.py", line 145
+    GPIO.output(8, GPIO.HIGH)
+TabError: inconsistent use of tabs and spaces in indentation
+Traceback (most recent call last):
+  File "/home/ootami/dev/smirkcat/smirkcat.py", line 14, in <module>
+    import RPi.GPIO as GPIO
+ModuleNotFoundError: No module named 'RPi'
+Ignoring exception in command <nextcord.application_command.SlashApplicationCommand object at 0x7faba22190>:
+Traceback (most recent call last):
+  File "/home/ootami/envs/mm/lib/python3.9/site-packages/nextcord/application_command.py", line 906, in invoke_callback_with_hooks
+    await self(interaction, *args, **kwargs)
+  File "/home/ootami/dev/smirkcat/smirkcat.py", line 143, in peekaboo
+    l = 5 / (speed / 2)
+NameError: name 'speed' is not defined
+
+The above exception was the direct cause of the following exception:
+
+nextcord.errors.ApplicationInvokeError: Command raised an exception: NameError: name 'speed' is not defined
+Logged in as Meow Meow 🙀#6007
+### LOGGED IN AS Meow Meow 🙀#6007, guild: bot testing ###
+### LOGGED IN AS Meow Meow 🙀#6007, guild: i had sex.. ###
+Ignoring exception in command <nextcord.application_command.SlashApplicationCommand object at 0x7fa3581130>:
+Traceback (most recent call last):
+  File "/home/ootami/envs/mm/lib/python3.9/site-packages/nextcord/application_command.py", line 906, in invoke_callback_with_hooks
+    await self(interaction, *args, **kwargs)
+  File "/home/ootami/dev/smirkcat/smirkcat.py", line 146, in peekaboo
+    sleep(bot.speed)
+NameError: name 'sleep' is not defined
+
+The above exception was the direct cause of the following exception:
+
+nextcord.errors.ApplicationInvokeError: Command raised an exception: NameError: name 'sleep' is not defined
+Logged in as Meow Meow 🙀#6007
+### LOGGED IN AS Meow Meow 🙀#6007, guild: bot testing ###
+### LOGGED IN AS Meow Meow 🙀#6007, guild: i had sex.. ###
+Logged in as Meow Meow 🙀#6007
+### LOGGED IN AS Meow Meow 🙀#6007, guild: bot testing ###
+### LOGGED IN AS Meow Meow 🙀#6007, guild: i had sex.. ###
+True
+Logged in as Meow Meow 🙀#6007
+### LOGGED IN AS Meow Meow 🙀#6007, guild: bot testing ###
+### LOGGED IN AS Meow Meow 🙀#6007, guild: i had sex.. ###
+True
+Logged in as meowmeowtest#1896
+### LOGGED IN AS meowmeowtest#1896, guild: bot testing ###
+True
+True
+Logged in as meowmeowtest#1896
+### LOGGED IN AS meowmeowtest#1896, guild: bot testing ###
+True
+True
+True
+True
+True
+True
+True
+True
+Logged in as meowmeowtest#1896
+### LOGGED IN AS meowmeowtest#1896, guild: bot testing ###
+peekaboo
+peekaboo
+peekaboo
+peekaboo
+Logged in as meowmeowtest#1896
+### LOGGED IN AS meowmeowtest#1896, guild: bot testing ###
+peekaboo
+peekaboo
+peekaboo
+peekaboo
+Logged in as meowmeowtest#1896
+### LOGGED IN AS meowmeowtest#1896, guild: bot testing ###
+peekaboo
