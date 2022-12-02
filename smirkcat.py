@@ -33,10 +33,14 @@ link = re.compile(
     "^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)$"
 )
 bot.speed = 0.07
+bot.on = True
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(8, GPIO.OUT, initial=GPIO.LOW)
 GPIO.setup(10, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(12, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(16, GPIO.OUT, initial=GPIO.LOW)
+
 
 @bot.event
 async def on_ready():
@@ -139,6 +143,14 @@ def rescale_frame(frame, percent=75):
     dim = (width, height)
     return cv2.resize(frame, dim, interpolation =cv2.INTER_AREA)
 
+def on_callback(channel):
+        if bot.on:
+            bot.on = False
+            GPIO.output(16, GPIO.HIGH)
+        else:
+            bot.on = True
+            GPIO.output(16, GPIO.LOW)
+
 @bot.slash_command(
     description="Takes a picture of lucas at his desk, optional gif (named by willem)", guild_ids=GUILDS
 )
@@ -147,13 +159,21 @@ async def peekaboo(
     gif: bool = nextcord.SlashOption(
         description = "get a fun little gif of lucas instead",
         required = 'false'
+    ),
+    scale: int = nextcord.SlashOption(
+        description = "use with gif to change the scale, the larger it is the longer it takes to create (default 25)",
+        required = 'false',
+        choices = {5, 25, 75, 100, 150, 200}
     )
 ):
     await interaction.response.defer()
     print("peekaboo")
+    if not bot.on:
+        await interaction.send("away from desk :crying_cat_face:")
+        return
     vid = cv2.VideoCapture(0)
     l = 5 / (bot.speed * 2)
-    if (gif):
+    if gif:
         while l > 0:
             GPIO.output(10, GPIO.HIGH)
             time.sleep(bot.speed)
@@ -163,11 +183,14 @@ async def peekaboo(
         print("capturing gif")
         frames = []
         count = 0
+        scale_by = 25
+        if scale:
+            scale_by = scale
         time.sleep(0.5)
         GPIO.output(10, GPIO.HIGH)
         while True:
             ret, frame = vid.read()
-            frames.append(rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=25))
+            frames.append(rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by))
             count += 1
             if (count == 150):
                 break
@@ -292,5 +315,5 @@ async def sendDownloadedTiktok(mes: nextcord.Message, link):
         print("download error, most likely slide show")
         await mes.reply("slide show :nauseated_face:")
 
-
+GPIO.add_event_detect(12, GPIO.RISING, callback=on_callback)
 bot.run(os.environ["TOKEN"])
