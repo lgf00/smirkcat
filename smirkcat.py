@@ -12,6 +12,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 import cv2
 import RPi.GPIO as GPIO
+import imageio
 
 load_dotenv()
 
@@ -137,6 +138,7 @@ def findAc(text, phrase):
 )
 async def peekaboo(
     interaction: nextcord.Interaction,
+    gif: str
 ):
     await interaction.response.defer()
     print("peekaboo")
@@ -148,19 +150,34 @@ async def peekaboo(
         GPIO.output(8, GPIO.LOW)
         time.sleep(bot.speed)
         l -= 1
+    if (gif == "gif"):
+        print("capturing gif")
+        frames = []
+        count = 0
+        GPIO.output(8, GPIO.HIGH)
+        while True:
+            ret, frame = cap.read()
+            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            count += 1
+            if (count == 150):
+                break
+        print("saving gif")
+        imageio.mimsave('./dancemonkeydance.gif', frames, fps=30)
+        gif = nextcord.File('./dancemonkeydance.gif')
+        await interaction.send(file=gif)
+    else:
+        print("capturing image")
+        time.sleep(0.5)
+        GPIO.output(8, GPIO.HIGH)
+        ret, frame = vid.read()
+        GPIO.output(8, GPIO.LOW)
 
-    time.sleep(0.5)
-    GPIO.output(8, GPIO.HIGH)
-    ret, frame = vid.read()
-    GPIO.output(8, GPIO.LOW)
-
-    if ret:
-        cv2.imwrite("capture.jpg", frame)
-    vid.release()
-    cv2.destroyAllWindows()
-    with open('capture.jpg', 'rb') as f:
-        pic = nextcord.File(f)
-        await interaction.send(file=pic)
+        if ret:
+            cv2.imwrite("capture.jpg", frame)
+        vid.release()
+        with open('capture.jpg', 'rb') as f:
+            pic = nextcord.File(f)
+            await interaction.send(file=pic)
 
 @bot.slash_command(
     description="Displays a users avatar and is never wrong", guild_ids=GUILDS
