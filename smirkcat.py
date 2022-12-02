@@ -36,6 +36,7 @@ bot.speed = 0.07
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(8, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(10, GPIO.OUT, initial=GPIO.LOW)
 
 @bot.event
 async def on_ready():
@@ -132,52 +133,71 @@ def findAc(text, phrase):
         + " ".join(findAc(after, "".join(phrase)).split("( )"))
     ).replace(")(", "")
 
+def rescale_frame(frame, percent=75):
+    width = int(frame.shape[1] * percent/ 100)
+    height = int(frame.shape[0] * percent/ 100)
+    dim = (width, height)
+    return cv2.resize(frame, dim, interpolation =cv2.INTER_AREA)
 
 @bot.slash_command(
-    description="Takes a picture of lucas at his desk", guild_ids=GUILDS
+    description="Takes a picture of lucas at his desk, optional gif (named by willem)", guild_ids=GUILDS
 )
 async def peekaboo(
     interaction: nextcord.Interaction,
-    gif: str
+    gif: bool = nextcord.SlashOption(
+        description = "get a fun little gif of lucas instead",
+        required = 'false'
+    )
 ):
     await interaction.response.defer()
     print("peekaboo")
     vid = cv2.VideoCapture(0)
     l = 5 / (bot.speed * 2)
-    while l > 0:
-        GPIO.output(8, GPIO.HIGH)
-        time.sleep(bot.speed)
-        GPIO.output(8, GPIO.LOW)
-        time.sleep(bot.speed)
-        l -= 1
-    if (gif == "gif"):
+    if (gif):
+        while l > 0:
+            GPIO.output(10, GPIO.HIGH)
+            time.sleep(bot.speed)
+            GPIO.output(10, GPIO.LOW)
+            time.sleep(bot.speed)
+            l -= 1
         print("capturing gif")
         frames = []
         count = 0
-        GPIO.output(8, GPIO.HIGH)
+        time.sleep(0.5)
+        GPIO.output(10, GPIO.HIGH)
         while True:
-            ret, frame = cap.read()
-            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            ret, frame = vid.read()
+            frames.append(rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=25))
             count += 1
             if (count == 150):
                 break
-        print("saving gif")
+        GPIO.output(10, GPIO.LOW)
+        print("creating gif")
         imageio.mimsave('./dancemonkeydance.gif', frames, fps=30)
-        gif = nextcord.File('./dancemonkeydance.gif')
-        await interaction.send(file=gif)
+        print("done creating gif")
+        try:
+            await interaction.send(file=nextcord.File('./dancemonkeydance.gif'))
+        except:
+            await interaction.send('oopsie file probably too big')
     else:
+        while l > 0:
+            GPIO.output(8, GPIO.HIGH)
+            time.sleep(bot.speed)
+            GPIO.output(8, GPIO.LOW)
+            time.sleep(bot.speed)
+            l -= 1
         print("capturing image")
         time.sleep(0.5)
         GPIO.output(8, GPIO.HIGH)
         ret, frame = vid.read()
         GPIO.output(8, GPIO.LOW)
-
+        print("done capturing image")
         if ret:
             cv2.imwrite("capture.jpg", frame)
-        vid.release()
-        with open('capture.jpg', 'rb') as f:
-            pic = nextcord.File(f)
-            await interaction.send(file=pic)
+            await interaction.send(file=nextcord.File('./capture.jpg'))
+        else:
+            await interaction.send('oopsie something went wrong!')
+    vid.release()
 
 @bot.slash_command(
     description="Displays a users avatar and is never wrong", guild_ids=GUILDS
