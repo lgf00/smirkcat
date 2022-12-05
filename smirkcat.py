@@ -9,10 +9,10 @@ from PIL import Image
 import os
 from fuzzywuzzy import fuzz
 from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError
 import cv2
 import RPi.GPIO as GPIO
 import imageio
+import json
 
 load_dotenv()
 
@@ -23,6 +23,8 @@ bot.lick_max = 604800
 bot.breeze_timer = 0
 bot.breeze_max = 604800
 bot.prev_ym = []
+bot.count = {}
+bot.messages = {}
 tiktok = re.compile(
     "([\\S\\s]*)(https:\\/\\/[a-z]+.tiktok.com\\/[t\\/]*[A-Za-z0-9]+\\/)([\\S\\s]*)"
 )
@@ -32,6 +34,7 @@ yourmom = re.compile(
 link = re.compile(
     "^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)$"
 )
+decrec = re.compile("^(\\W+)|(\\W+)$")
 bot.speed = 0.07
 bot.on = True
 GPIO.setwarnings(False)
@@ -45,15 +48,28 @@ bot.dev_user = None
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
     await bot.change_presence(activity=nextcord.Game("with your mom"))
     for guild in bot.guilds:
         await guild.me.edit(nick="Meow Meow 🙀")
         print("### LOGGED IN AS {0.user}, guild: {1} ###".format(bot, guild))
+    with open("count.json", "rb") as f:
+        bot.count = json.load(f)
+    with open("messages.json", "rb") as f:
+        bot.messages = json.load(f)
     bot.dev_user = await bot.fetch_user(155512383681462272)
     if bot.dev_user is not None:
         if bot.dev_user.dm_channel is None:
             await bot.dev_user.create_dm()
+    print(f"Logged in as {bot.user}")
+
+
+@bot.event
+async def on_member_join(member: nextcord.Member):
+    print("new member")
+    for text in bot.count:
+        bot.count[text][member.id] = 0
+    dump_count()
+
 
 @bot.event
 async def on_message(mes: nextcord.Message):
@@ -86,6 +102,24 @@ async def on_message(mes: nextcord.Message):
         print("tiktok found in message")
         async with mes.channel.typing():
             await sendDownloadedTiktok(mes, tiktok.match(mes.content).group(2))
+    deconstructed = deconstruct(message_oneline)
+    for text in bot.count:
+        if text in deconstructed:
+            update_count(mes, text)
+    bot.messages["messages"].append(mes)
+    dump_messages()
+
+
+def replacer(match):
+    if match.group(1) is not None:
+        return "{} ".format(match.group(1))
+    else:
+        return " {}".format(match.group(2))
+
+
+def deconstruct(mes):
+    mes = " ".join([decrec.sub(replacer, word) for word in mes.split()])
+    return mes
 
 
 async def feet(message, word):
@@ -141,36 +175,156 @@ def findAc(text, phrase):
         + " ".join(findAc(after, "".join(phrase)).split("( )"))
     ).replace(")(", "")
 
+
+@bot.slash_command(
+    description="downloads all messages DO NOT USE",
+    guild_ids=GUILDS,
+)
+async def download(interaction: nextcord.Interaction):
+    if interaction.message.author is not bot.dev_user:
+        interaction.send("smh my head, not authorized", ephemeral=True)
+        return
+    interaction.send(
+        f"{interaction.message.author.mention} downloading messages...", ephemeral=True
+    )
+    t0 = time.time()
+    new_msgs = {"messages": []}
+    for channel in interaction.guild.channels:
+        if str(channel.type) == "text":
+            new_msgs["messages"].extend(await channel.history(limit=None).flatten())
+    interaction.send(
+        f"{interaction.message.author.mention} updating bot.messages...", ephemeral=True
+    )
+    bot.messages = list(set(bot.messages + new_msgs))
+    interaction.send(
+        f"{interaction.message.author.mention} dumping messages...", ephemeral=True
+    )
+    dump_messages()
+    t1 = time.time()
+    interaction.send(
+        f"{interaction.message.author.mention} complete, time elapsed {int((t1 - t0) / 60)}m",
+        ephemeral=True,
+    )
+
+
+@bot.slash_command(
+    description="Starts a new count on specified word or phrase",
+    guild_ids=GUILDS,
+)
+async def countnew(
+    interaction: nextcord.Interaction,
+    text: str = nextcord.SlashOption(description="the word or phrase to be counted"),
+):
+    await interaction.response.defer(ephemeral=True)
+    bot.count[text] = {}
+    t0 = time.time()
+    print("new count started")
+    print("creating dict entries")
+    await interaction.send(
+        f"{interaction.message.author.mention} creating entires in database",
+        ephemeral=True,
+    )
+    async for member in interaction.guild.fetch_members(limit=None):
+        if not member.bot:
+            bot.count[text][member.id] = 0
+    await interaction.send(
+        f"{interaction.message.author.mention} counting", ephemeral=True
+    )
+    for msg in bot.messages:
+        dec = deconstruct(msg.content.lower())
+        bot.count[text][msg.auther.id] += dec.count(text)
+    await interaction.send(
+        f"{interaction.message.author.mention} saving database", ephemeral=True
+    )
+    dump_count()
+    t1 = time.time()
+    await interaction.send(
+        '{0} count complete on "{1}"\ntotal messages searched: {2}\ntime elapsed: {3}m'.format(
+            interaction.message.author.mention,
+            text,
+            len(bot.messages),
+            int((t1 - t0) / 60),
+        )
+    )
+
+
+@bot.slash_command(
+    description="get the count of specified phrase and users",
+    guild_ids=GUILDS,
+)
+async def countget(
+    interaction: nextcord.Interaction,
+    text: str = nextcord.SlashOption(
+        description="the word or phrase", choices=bot.count.keys()
+    ),
+    users: str = nextcord.SlashOption(
+        description="type one or more names (can be @mentions) separated by spaces"
+    ),
+):
+    names = users.split(" ")
+    names = [i for i in names if i != ""]
+    if len(names) == 1:
+        member: nextcord.Member = await get_member(interaction, names[0])
+        interaction.send(
+            f"{member.mention} as said '{text}' {bot.count[text][member.id]} times"
+        )
+    else:
+        content = f"Count for '{text}'\n\n"
+        for name in names:
+            member: nextcord.Member = await get_member(interaction, name)
+            content += f"{member.mention}: {bot.count[text][member.id]}\n"
+        interaction.send(content)
+
+
+@bot.slash_command(
+    description="get the top 5 users of a specified phrase",
+    guild_ids=GUILDS,
+)
+async def counttop(
+    interaction: nextcord.Interaction,
+    text: str = nextcord.SlashOption(
+        description="the word or phrase", choices=bot.count.keys()
+    ),
+):
+    top5 = sorted(bot.count[text], key=bot.count[text].get, reverse=True)[:5]
+    content = f"'{text}' top 5:\n\n"
+    for t in top5:
+        content += f"{interaction.guild.fetch_member(t)}: {bot.count[text][t]}\n"
+    interaction.send(content)
+
+
 def rescale_frame(frame, percent):
     if percent == 100:
         return frame
-    width = int(frame.shape[1] * percent/100)
-    height = int(frame.shape[0] * percent/100)
+    width = int(frame.shape[1] * percent / 100)
+    height = int(frame.shape[0] * percent / 100)
     dim = (width, height)
     return cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
 
+
 def on_callback(channel):
-        if bot.on:
-            bot.on = False
-            GPIO.output(16, GPIO.HIGH)
-        else:
-            bot.on = True
-            GPIO.output(16, GPIO.LOW)
+    if bot.on:
+        bot.on = False
+        GPIO.output(16, GPIO.HIGH)
+    else:
+        bot.on = True
+        GPIO.output(16, GPIO.LOW)
+
 
 @bot.slash_command(
-    description="Takes a picture of lucas at his desk, options: gif, scale (named by willem)", guild_ids=GUILDS
+    description="Takes a picture of lucas at his desk, options: gif, scale (named by willem)",
+    guild_ids=GUILDS,
 )
 async def peekaboo(
     interaction: nextcord.Interaction,
     gif: bool = nextcord.SlashOption(
-        description = "get a fun little gif of lucas instead",
-        required = 'false'
+        description="get a fun little gif of lucas instead", required="false"
     ),
     scale: int = nextcord.SlashOption(
-        description = "the larger it is the longer it takes to create (default 25 for gif, 100 for image)",
-        required = 'false',
-        choices = {10, 25, 100}
-    )
+        description="the larger it is the longer it takes to create (default 25 for gif, 100 for image)",
+        required="false",
+        choices={10, 25, 100},
+    ),
 ):
     await interaction.response.defer(ephemeral=True)
     print("peekaboo")
@@ -178,15 +332,15 @@ async def peekaboo(
         await interaction.send("mimimimimi :sleeping_accommodation:")
         return
     vid = cv2.VideoCapture(0)
-    l = 5 / (bot.speed * 2)
+    blink_time = 5 / (bot.speed * 2)
     scale_by = 100
     if gif:
-        while l > 0:
+        while blink_time > 0:
             GPIO.output(10, GPIO.HIGH)
             time.sleep(bot.speed)
             GPIO.output(10, GPIO.LOW)
             time.sleep(bot.speed)
-            l -= 1
+            blink_time -= 1
         print("capturing gif")
         frames = []
         count = 0
@@ -199,53 +353,66 @@ async def peekaboo(
         while True:
             ret, frame = vid.read()
             if not ret:
-                print('ret error capturing frame')
-                await bot.dev_user.dm_channel.send('ret error capturing frame')
-                interaction.send(content="```diff\n- Something went wrong!\n```", ephemeral=True)
+                print("ret error capturing frame")
+                await bot.dev_user.dm_channel.send("ret error capturing frame")
+                interaction.send(
+                    content="```diff\n- Something went wrong!\n```", ephemeral=True
+                )
                 return
-            frames.append(rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by))
+            frames.append(
+                rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by)
+            )
             count += 1
-            if (count == 150):
+            if count == 150:
                 break
         GPIO.output(10, GPIO.LOW)
         print("creating gif")
         try:
-            imageio.mimsave('./dancemonkeydance.gif', frames, fps=30)
-            print('done creating gif')
-            await interaction.send(file=nextcord.File('./dancemonkeydance.gif'))
+            imageio.mimsave("./dancemonkeydance.gif", frames, fps=30)
+            print("done creating gif")
+            await interaction.send(file=nextcord.File("./dancemonkeydance.gif"))
         except Exception as e:
             print(e)
             await bot.dev_user.dm_channel.send(e)
-            await interaction.send(content="```diff\n- File probably too big!\n```", ephemeral=True)
+            await interaction.send(
+                content="```diff\n- File probably too big!\n```", ephemeral=True
+            )
     else:
-        while l > 0:
+        while blink_time > 0:
             GPIO.output(8, GPIO.HIGH)
             time.sleep(bot.speed)
             GPIO.output(8, GPIO.LOW)
             time.sleep(bot.speed)
-            l -= 1
+            blink_time -= 1
         print("capturing image")
         time.sleep(0.5)
         GPIO.output(8, GPIO.HIGH)
         ret, frame = vid.read()
         if not ret:
-            print('ret error capturing frame')
-            await bot.dev_user.dm_channel.send('ret error capturing frame')
-            interaction.send(content='```diff\n- Something went wrong!\n```', ephemeral=True)
+            print("ret error capturing frame")
+            await bot.dev_user.dm_channel.send("ret error capturing frame")
+            interaction.send(
+                content="```diff\n- Something went wrong!\n```", ephemeral=True
+            )
             return
         GPIO.output(8, GPIO.LOW)
         print("done capturing image")
         if scale:
             scale_by = scale
         try:
-            frame = rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by)
+            frame = rescale_frame(
+                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by
+            )
             cv2.imwrite("capture.jpg", frame)
-            await interaction.send(file=nextcord.File('./capture.jpg'))
+            await interaction.send(file=nextcord.File("./capture.jpg"))
         except Exception as e:
             print(e)
             await bot.dev_user.dm_channel.send(e)
-            await interaction.send(content='```diff\n- Something went wrong!\n```', ephemeral=True)
+            await interaction.send(
+                content="```diff\n- Something went wrong!\n```", ephemeral=True
+            )
     vid.release()
+
 
 @bot.slash_command(
     description="Displays a users avatar and is never wrong", guild_ids=GUILDS
@@ -276,7 +443,9 @@ async def avatar(
                 await interaction.send(embed=embed)
         else:
             print(f"{name} not found")
-            await interaction.send(f"```diff\n- Could not find user with name: {name}\n```", ephemeral=True)
+            await interaction.send(
+                f"```diff\n- Could not find user with name: {name}\n```", ephemeral=True
+            )
 
 
 # GET MEMBER OBJECT FROM NAME
@@ -330,8 +499,8 @@ async def sendDownloadedTiktok(mes: nextcord.Message, link):
     }
     try:
         with YoutubeDL(yt_ops) as ydl:
-            if ('www' in link):
-                link = link.replace('www', 'vm')
+            if "www" in link:
+                link = link.replace("www", "vm")
                 print(link)
             ydl.download(link)
         await mes.reply(file=nextcord.File(r"./dltiktok.mp4"))
@@ -340,6 +509,23 @@ async def sendDownloadedTiktok(mes: nextcord.Message, link):
         print(e)
         bot.dev_user.send(e)
         await mes.reply("slide show :nauseated_face:")
+
+
+def update_count(mes: nextcord.Message, text, deconstructed):
+    print("tracked text...", text)
+    bot.count[text][mes.author.id] += deconstructed.count(text)
+    dump_count()
+
+
+def dump_count():
+    with open("count.json", "w") as f:
+        json.dump(bot.count, f)
+
+
+def dump_messages():
+    with open("messages.json", "w") as f:
+        json.dump(bot.messages, f)
+
 
 GPIO.add_event_detect(12, GPIO.RISING, callback=on_callback)
 bot.run(os.environ["TOKEN"])
