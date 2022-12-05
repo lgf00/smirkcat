@@ -40,6 +40,7 @@ GPIO.setup(8, GPIO.OUT, initial=GPIO.LOW)
 GPIO.setup(10, GPIO.OUT, initial=GPIO.LOW)
 GPIO.setup(12, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(16, GPIO.OUT, initial=GPIO.LOW)
+bot.dev_user = None
 
 
 @bot.event
@@ -49,7 +50,10 @@ async def on_ready():
     for guild in bot.guilds:
         await guild.me.edit(nick="Meow Meow 🙀")
         print("### LOGGED IN AS {0.user}, guild: {1} ###".format(bot, guild))
-
+    bot.dev_user = await bot.fetch_user(155512383681462272)
+    if bot.dev_user is not None:
+        if bot.dev_user.dm_channel is None:
+            await bot.dev_user.create_dm()
 
 @bot.event
 async def on_message(mes: nextcord.Message):
@@ -68,7 +72,7 @@ async def on_message(mes: nextcord.Message):
             bot.prev_ym.append(message_oneline)
             print("contains your mom")
             async with mes.channel.typing():
-                ac = findAc(mes.content.lower(), "yourmom")
+                ac = findAc(message_oneline, "yourmom")
                 bot.prev_ym.append(ac)
                 await mes.channel.send(ac)
     for trigger in ["feet", "foot", "toes", "toe"]:
@@ -137,11 +141,13 @@ def findAc(text, phrase):
         + " ".join(findAc(after, "".join(phrase)).split("( )"))
     ).replace(")(", "")
 
-def rescale_frame(frame, percent=75):
-    width = int(frame.shape[1] * percent/ 100)
-    height = int(frame.shape[0] * percent/ 100)
+def rescale_frame(frame, percent):
+    if percent == 100:
+        return frame
+    width = int(frame.shape[1] * percent/100)
+    height = int(frame.shape[0] * percent/100)
     dim = (width, height)
-    return cv2.resize(frame, dim, interpolation =cv2.INTER_AREA)
+    return cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
 
 def on_callback(channel):
         if bot.on:
@@ -152,7 +158,7 @@ def on_callback(channel):
             GPIO.output(16, GPIO.LOW)
 
 @bot.slash_command(
-    description="Takes a picture of lucas at his desk, optional gif (named by willem)", guild_ids=GUILDS
+    description="Takes a picture of lucas at his desk, options: gif, scale (named by willem)", guild_ids=GUILDS
 )
 async def peekaboo(
     interaction: nextcord.Interaction,
@@ -161,18 +167,19 @@ async def peekaboo(
         required = 'false'
     ),
     scale: int = nextcord.SlashOption(
-        description = "use with gif to change the scale, the larger it is the longer it takes to create (default 25)",
+        description = "the larger it is the longer it takes to create (default 25 for gif, 100 for image)",
         required = 'false',
-        choices = {5, 25, 75, 100, 150, 200}
+        choices = {10, 25, 100}
     )
 ):
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
     print("peekaboo")
     if not bot.on:
-        await interaction.send("away from desk :crying_cat_face:")
+        await interaction.send("mimimimimi :sleeping_accommodation:")
         return
     vid = cv2.VideoCapture(0)
     l = 5 / (bot.speed * 2)
+    scale_by = 100
     if gif:
         while l > 0:
             GPIO.output(10, GPIO.HIGH)
@@ -183,25 +190,33 @@ async def peekaboo(
         print("capturing gif")
         frames = []
         count = 0
-        scale_by = 25
         if scale:
             scale_by = scale
+        else:
+            scale_by = 25
         time.sleep(0.5)
         GPIO.output(10, GPIO.HIGH)
         while True:
             ret, frame = vid.read()
+            if not ret:
+                print('ret error capturing frame')
+                await bot.dev_user.dm_channel.send('ret error capturing frame')
+                interaction.send(content="```diff\n- Something went wrong!\n```", ephemeral=True)
+                return
             frames.append(rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by))
             count += 1
             if (count == 150):
                 break
         GPIO.output(10, GPIO.LOW)
         print("creating gif")
-        imageio.mimsave('./dancemonkeydance.gif', frames, fps=30)
-        print("done creating gif")
         try:
+            imageio.mimsave('./dancemonkeydance.gif', frames, fps=30)
+            print('done creating gif')
             await interaction.send(file=nextcord.File('./dancemonkeydance.gif'))
-        except:
-            await interaction.send('oopsie file probably too big')
+        except Exception as e:
+            print(e)
+            await bot.dev_user.dm_channel.send(e)
+            await interaction.send(content="```diff\n- File probably too big!\n```", ephemeral=True)
     else:
         while l > 0:
             GPIO.output(8, GPIO.HIGH)
@@ -213,13 +228,23 @@ async def peekaboo(
         time.sleep(0.5)
         GPIO.output(8, GPIO.HIGH)
         ret, frame = vid.read()
+        if not ret:
+            print('ret error capturing frame')
+            await bot.dev_user.dm_channel.send('ret error capturing frame')
+            interaction.send(content='```diff\n- Something went wrong!\n```', ephemeral=True)
+            return
         GPIO.output(8, GPIO.LOW)
         print("done capturing image")
-        if ret:
+        if scale:
+            scale_by = scale
+        try:
+            frame = rescale_frame(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), percent=scale_by)
             cv2.imwrite("capture.jpg", frame)
             await interaction.send(file=nextcord.File('./capture.jpg'))
-        else:
-            await interaction.send('oopsie something went wrong!')
+        except Exception as e:
+            print(e)
+            await bot.dev_user.dm_channel.send(e)
+            await interaction.send(content='```diff\n- Something went wrong!\n```', ephemeral=True)
     vid.release()
 
 @bot.slash_command(
@@ -251,7 +276,7 @@ async def avatar(
                 await interaction.send(embed=embed)
         else:
             print(f"{name} not found")
-            await interaction.send(f"Could not find user with name: {name}")
+            await interaction.send(f"```diff\n- Could not find user with name: {name}\n```", ephemeral=True)
 
 
 # GET MEMBER OBJECT FROM NAME
@@ -311,8 +336,9 @@ async def sendDownloadedTiktok(mes: nextcord.Message, link):
             ydl.download(link)
         await mes.reply(file=nextcord.File(r"./dltiktok.mp4"))
         os.remove("./dltiktok.mp4")
-    except DownloadError:
-        print("download error, most likely slide show")
+    except Exception as e:
+        print(e)
+        bot.dev_user.send(e)
         await mes.reply("slide show :nauseated_face:")
 
 GPIO.add_event_detect(12, GPIO.RISING, callback=on_callback)
