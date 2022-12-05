@@ -24,7 +24,6 @@ bot.breeze_timer = 0
 bot.breeze_max = 604800
 bot.prev_ym = []
 bot.count = {}
-bot.messages = {}
 tiktok = re.compile(
     "([\\S\\s]*)(https:\\/\\/[a-z]+.tiktok.com\\/[t\\/]*[A-Za-z0-9]+\\/)([\\S\\s]*)"
 )
@@ -54,8 +53,6 @@ async def on_ready():
         print("### LOGGED IN AS {0.user}, guild: {1} ###".format(bot, guild))
     with open("count.json", "rb") as f:
         bot.count = json.load(f)
-    with open("messages.json", "rb") as f:
-        bot.messages = json.load(f)
     bot.dev_user = await bot.fetch_user(155512383681462272)
     if bot.dev_user is not None:
         if bot.dev_user.dm_channel is None:
@@ -102,12 +99,12 @@ async def on_message(mes: nextcord.Message):
         print("tiktok found in message")
         async with mes.channel.typing():
             await sendDownloadedTiktok(mes, tiktok.match(mes.content).group(2))
-    deconstructed = deconstruct(message_oneline)
+    decon = deconstruct(message_oneline)
     for text in bot.count:
-        if text in deconstructed:
-            update_count(mes, text)
-    bot.messages["messages"].append(mes)
-    dump_messages()
+        if text == "tocount":
+            continue
+        if text in decon:
+            update_count(mes, text, decon)
 
 
 def replacer(match):
@@ -177,37 +174,6 @@ def findAc(text, phrase):
 
 
 @bot.slash_command(
-    description="downloads all messages DO NOT USE",
-    guild_ids=GUILDS,
-)
-async def download(interaction: nextcord.Interaction):
-    if interaction.message.author is not bot.dev_user:
-        interaction.send("smh my head, not authorized", ephemeral=True)
-        return
-    interaction.send(
-        f"{interaction.message.author.mention} downloading messages...", ephemeral=True
-    )
-    t0 = time.time()
-    new_msgs = {"messages": []}
-    for channel in interaction.guild.channels:
-        if str(channel.type) == "text":
-            new_msgs["messages"].extend(await channel.history(limit=None).flatten())
-    interaction.send(
-        f"{interaction.message.author.mention} updating bot.messages...", ephemeral=True
-    )
-    bot.messages = list(set(bot.messages + new_msgs))
-    interaction.send(
-        f"{interaction.message.author.mention} dumping messages...", ephemeral=True
-    )
-    dump_messages()
-    t1 = time.time()
-    interaction.send(
-        f"{interaction.message.author.mention} complete, time elapsed {int((t1 - t0) / 60)}m",
-        ephemeral=True,
-    )
-
-
-@bot.slash_command(
     description="Starts a new count on specified word or phrase",
     guild_ids=GUILDS,
 )
@@ -219,20 +185,35 @@ async def countnew(
     bot.count[text] = {}
     t0 = time.time()
     print("new count started")
-    print("creating dict entries")
+    # CREATING NEW ENTRIES FOR TEXT
     await interaction.send(
         f"{interaction.message.author.mention} creating entires in database",
         ephemeral=True,
     )
+    print("creating dict entries")
     async for member in interaction.guild.fetch_members(limit=None):
         if not member.bot:
             bot.count[text][member.id] = 0
+    # COLLECTING MESSAGES
+    interaction.send(
+        f"{interaction.message.author.mention} downloading messages...", ephemeral=True
+    )
+    print("downloading all messages")
+    msgs: list[nextcord.Message] = []
+    for channel in interaction.guild.channels:
+        if str(channel.type) == "text":
+            msgs.extend(await channel.history(limit=None).flatten())
+    # COUNTING
     await interaction.send(
         f"{interaction.message.author.mention} counting", ephemeral=True
     )
-    for msg in bot.messages:
+    print("counting all messages")
+    for msg in msgs:
         dec = deconstruct(msg.content.lower())
-        bot.count[text][msg.auther.id] += dec.count(text)
+        if text in dec:
+            bot.count[text][msg.author.id] += dec.count(text)
+    # UPDATING JSON
+    print("updating json")
     await interaction.send(
         f"{interaction.message.author.mention} saving database", ephemeral=True
     )
@@ -242,7 +223,7 @@ async def countnew(
         '{0} count complete on "{1}"\ntotal messages searched: {2}\ntime elapsed: {3}m'.format(
             interaction.message.author.mention,
             text,
-            len(bot.messages),
+            len(msgs),
             int((t1 - t0) / 60),
         )
     )
@@ -266,7 +247,7 @@ async def countget(
     if len(names) == 1:
         member: nextcord.Member = await get_member(interaction, names[0])
         interaction.send(
-            f"{member.mention} as said '{text}' {bot.count[text][member.id]} times"
+            f"{member.mention} has said '{text}' {bot.count[text][member.id]} times"
         )
     else:
         content = f"Count for '{text}'\n\n"
@@ -511,20 +492,15 @@ async def sendDownloadedTiktok(mes: nextcord.Message, link):
         await mes.reply("slide show :nauseated_face:")
 
 
-def update_count(mes: nextcord.Message, text, deconstructed):
+def update_count(mes: nextcord.Message, text, decon):
     print("tracked text...", text)
-    bot.count[text][mes.author.id] += deconstructed.count(text)
+    bot.count[text][mes.author.id] += decon.count(text)
     dump_count()
 
 
 def dump_count():
     with open("count.json", "w") as f:
         json.dump(bot.count, f)
-
-
-def dump_messages():
-    with open("messages.json", "w") as f:
-        json.dump(bot.messages, f)
 
 
 GPIO.add_event_detect(12, GPIO.RISING, callback=on_callback)
