@@ -64,7 +64,7 @@ async def on_ready():
 async def on_member_join(member: nextcord.Member):
     print("new member")
     for text in bot.count:
-        bot.count[text][member.id] = 0
+        bot.count[text][str(member.id)] = 0
     dump_count()
 
 
@@ -100,11 +100,15 @@ async def on_message(mes: nextcord.Message):
         async with mes.channel.typing():
             await sendDownloadedTiktok(mes, tiktok.match(mes.content).group(2))
     decon = deconstruct(message_oneline)
-    for text in bot.count:
-        if text == "tocount":
-            continue
-        if text in decon:
-            update_count(mes, text, decon)
+    print(f"dec msg '{decon}'")
+    for text in bot.count["tocount"]:
+        dec_text = text
+        if len(text) != 1:
+            dec_text = deconstruct(text)
+        if dec_text in decon:
+            print(f"count found... text")
+            bot.count[text][str(mes.author.id)] += decon.count(dec_text)
+            dump_count()
 
 
 def replacer(match):
@@ -182,46 +186,45 @@ async def countnew(
     text: str = nextcord.SlashOption(description="the word or phrase to be counted"),
 ):
     await interaction.response.defer(ephemeral=True)
+    if text in bot.count["tocount"]:
+        await interaction.send("already being counted, use /countlist to see a list of what is being counted\n/countget or /counttop to see the count", ephemeral=True)
+    text = text.lower()
     bot.count[text] = {}
+    bot.count["tocount"].append(text)
     t0 = time.time()
     print("new count started")
+    print(bot.count)
     # CREATING NEW ENTRIES FOR TEXT
-    await interaction.send(
-        f"{interaction.message.author.mention} creating entires in database",
-        ephemeral=True,
-    )
     print("creating dict entries")
     async for member in interaction.guild.fetch_members(limit=None):
         if not member.bot:
-            bot.count[text][member.id] = 0
+            bot.count[text][str(member.id)] = 0
+    print(bot.count)
     # COLLECTING MESSAGES
-    interaction.send(
-        f"{interaction.message.author.mention} downloading messages...", ephemeral=True
-    )
     print("downloading all messages")
     msgs: list[nextcord.Message] = []
     for channel in interaction.guild.channels:
         if str(channel.type) == "text":
             msgs.extend(await channel.history(limit=None).flatten())
     # COUNTING
-    await interaction.send(
-        f"{interaction.message.author.mention} counting", ephemeral=True
-    )
     print("counting all messages")
+    dec_text = text
+    if len(text) != 1:
+    	dec_text = deconstruct(text)
     for msg in msgs:
+        if msg.author.bot:
+            continue
         dec = deconstruct(msg.content.lower())
-        if text in dec:
-            bot.count[text][msg.author.id] += dec.count(text)
+        if dec_text in dec:
+            bot.count[text][str(msg.author.id)] += dec.count(dec_text)
     # UPDATING JSON
     print("updating json")
-    await interaction.send(
-        f"{interaction.message.author.mention} saving database", ephemeral=True
-    )
     dump_count()
     t1 = time.time()
+    print(f"finished in {t1-t0}s")
     await interaction.send(
-        '{0} count complete on "{1}"\ntotal messages searched: {2}\ntime elapsed: {3}m'.format(
-            interaction.message.author.mention,
+        '{0} count complete on **{1}**\ntotal messages searched: {2}\ntime elapsed: {3}m'.format(
+            interaction.user.mention,
             text,
             len(msgs),
             int((t1 - t0) / 60),
@@ -236,25 +239,25 @@ async def countnew(
 async def countget(
     interaction: nextcord.Interaction,
     text: str = nextcord.SlashOption(
-        description="the word or phrase", choices=bot.count.keys()
+        description="valid, already counted word or phrase (use /countlist to get a list of what is being counted)",
     ),
     users: str = nextcord.SlashOption(
         description="type one or more names (can be @mentions) separated by spaces"
     ),
 ):
+    if text not in bot.count["tocount"]:
+        await interaction.send("invalid text, use /countlist to get a list of what is being counted, otherwise start a new count using /countnew", ephemeral=True)
+        return
     names = users.split(" ")
     names = [i for i in names if i != ""]
-    if len(names) == 1:
-        member: nextcord.Member = await get_member(interaction, names[0])
-        interaction.send(
-            f"{member.mention} has said '{text}' {bot.count[text][member.id]} times"
-        )
-    else:
-        content = f"Count for '{text}'\n\n"
-        for name in names:
-            member: nextcord.Member = await get_member(interaction, name)
-            content += f"{member.mention}: {bot.count[text][member.id]}\n"
-        interaction.send(content)
+    content = ""
+    for name in names:
+        member: nextcord.Member = await get_member(interaction, name)
+        content += f"{member.mention} has said **{text}** {bot.count[text][str(member.id)]} times\n"
+    if len(content) == 0:
+        await interaction.send("uhoh spaghetti-oh", ephemeral=True)
+        return
+    await interaction.send(content)
 
 
 @bot.slash_command(
@@ -264,14 +267,34 @@ async def countget(
 async def counttop(
     interaction: nextcord.Interaction,
     text: str = nextcord.SlashOption(
-        description="the word or phrase", choices=bot.count.keys()
-    ),
+        description="valid, already counted word or phrase (use /countlist to get a list of what is being counted)",
+    )
 ):
+    if text not in bot.count["tocount"]:
+        await interaction.send("invalid text, use /countlist to get a list of what is being counted, otherwise start a new count using /countnew", ephemeral=True)
+        return
     top5 = sorted(bot.count[text], key=bot.count[text].get, reverse=True)[:5]
-    content = f"'{text}' top 5:\n\n"
+    content = f"TOP 5 ***{text}***:\n"
     for t in top5:
-        content += f"{interaction.guild.fetch_member(t)}: {bot.count[text][t]}\n"
-    interaction.send(content)
+        member: nextcord.Member = await interaction.guild.fetch_member(t)
+        content += f"{member.mention} - {bot.count[text][t]}\n"
+    await interaction.send(content)
+
+
+@bot.slash_command(
+    description="list of text that is currently being counted",
+    guild_ids=GUILDS,
+)
+async def countlist(
+    interaction: nextcord.Interaction
+):
+    content = ""
+    for text in bot.count["tocount"]:
+        content += f"**{text}**, "
+    if len(content) == 0:
+        await interaction.send("nothing has been counted, use /countnew to change that", ephemeral=True)
+        return
+    await interaction.send(content[:-2], ephemeral=True)
 
 
 def rescale_frame(frame, percent):
@@ -490,12 +513,6 @@ async def sendDownloadedTiktok(mes: nextcord.Message, link):
         print(e)
         bot.dev_user.send(e)
         await mes.reply("slide show :nauseated_face:")
-
-
-def update_count(mes: nextcord.Message, text, decon):
-    print("tracked text...", text)
-    bot.count[text][mes.author.id] += decon.count(text)
-    dump_count()
 
 
 def dump_count():
