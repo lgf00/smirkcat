@@ -13,6 +13,7 @@ import cv2
 import RPi.GPIO as GPIO
 import imageio
 import json
+import datetime
 
 load_dotenv()
 
@@ -99,16 +100,21 @@ async def on_message(mes: nextcord.Message):
         print("tiktok found in message")
         async with mes.channel.typing():
             await sendDownloadedTiktok(mes, tiktok.match(mes.content).group(2))
+    bot.count["msgs"].append(
+        {
+         "user_id": mes.author.id,
+         "content": mes.content
+        }
+    )
     decon = deconstruct(message_oneline)
-    print(f"dec msg '{decon}'")
     for text in bot.count["tocount"]:
         dec_text = text
         if len(text) != 1:
             dec_text = deconstruct(text)
         if dec_text in decon:
-            print(f"count found... text")
+            print(f"count found... {text}")
             bot.count[text][str(mes.author.id)] += decon.count(dec_text)
-            dump_count()
+    dump_count()
 
 
 def replacer(match):
@@ -178,6 +184,43 @@ def findAc(text, phrase):
 
 
 @bot.slash_command(
+    description="you can't use this",
+    guild_ids=GUILDS
+)
+async def download(
+    interaction = nextcord.Interaction,
+):
+    if interaction.user.id != bot.dev_user.id:
+        await interaction.send("I said you can't use this", ephemeral=True)
+        return
+    t0 = time.time()
+    prev_date = datetime.datetime.strptime(bot.count["date"], '%Y-%m-%d %H:%M:%S.%f')
+    date = datetime.datetime.utcnow()
+    await interaction.send(f"Starting download before {date} and recording new ones", ephemeral=True)
+    # DOWNLOAD
+    print("DOWNLOADING MESSAGES")
+    msgs: list[nextcord.Message] = []
+    for channel in interaction.guild.channels:
+        if str(channel.type) == "text":
+            msgs.extend(await channel.history(limit=None, after=prev_date).flatten())
+    # CREATING JSON-ABLE MESSAGES
+    print("CREATING JSON-ABLE MESSAGES")
+    for msg in msgs:
+        if msg.author.bot:
+            continue
+        new_msg = {}
+        new_msg["user_id"] = str(msg.author.id)
+        new_msg["content"] = msg.content
+        bot.count["msgs"].append(new_msg)
+    # DUMP
+    print("SAVING COUNT.JSON")
+    dump_count()
+    t1 = time.time()
+    bot.count["date"] = str(date)
+    print(f"DOWNLOAD COMPLETE {round((t1-t0)/60, 2)}")
+
+
+@bot.slash_command(
     description="Starts a new count on specified word or phrase",
     guild_ids=GUILDS,
 )
@@ -185,49 +228,40 @@ async def countnew(
     interaction: nextcord.Interaction,
     text: str = nextcord.SlashOption(description="the word or phrase to be counted"),
 ):
-    await interaction.response.defer(ephemeral=True)
     if text in bot.count["tocount"]:
         await interaction.send("already being counted, use /countlist to see a list of what is being counted\n/countget or /counttop to see the count", ephemeral=True)
+        return
+    await interaction.response.defer()
     text = text.lower()
     bot.count[text] = {}
     bot.count["tocount"].append(text)
     t0 = time.time()
-    print("new count started")
-    print(bot.count)
+    print("NEW COUNT STARTED")
     # CREATING NEW ENTRIES FOR TEXT
-    print("creating dict entries")
+    print("CREATING ENTRIES")
     async for member in interaction.guild.fetch_members(limit=None):
         if not member.bot:
             bot.count[text][str(member.id)] = 0
-    print(bot.count)
-    # COLLECTING MESSAGES
-    print("downloading all messages")
-    msgs: list[nextcord.Message] = []
-    for channel in interaction.guild.channels:
-        if str(channel.type) == "text":
-            msgs.extend(await channel.history(limit=None).flatten())
     # COUNTING
-    print("counting all messages")
+    print("COUNTING")
     dec_text = text
     if len(text) != 1:
     	dec_text = deconstruct(text)
-    for msg in msgs:
-        if msg.author.bot:
-            continue
-        dec = deconstruct(msg.content.lower())
-        if dec_text in dec:
-            bot.count[text][str(msg.author.id)] += dec.count(dec_text)
+    for msg in bot.count["msgs"]:
+        if msg["user_id"] in bot.count[text]:
+            dec = deconstruct(msg["content"].lower())
+            bot.count[text][str(msg["user_id"])] += dec.count(dec_text)
     # UPDATING JSON
-    print("updating json")
+    print("UPDATING COUNT.JSON")
     dump_count()
     t1 = time.time()
-    print(f"finished in {t1-t0}s")
+    print(f"FINISHED IN {t1-t0}s")
     await interaction.send(
-        '{0} count complete on **{1}**\ntotal messages searched: {2}\ntime elapsed: {3}m'.format(
+        '{0} count complete on **{1}**\ntotal messages searched: {2}\ntime elapsed: {3}s'.format(
             interaction.user.mention,
             text,
-            len(msgs),
-            int((t1 - t0) / 60),
+            len(bot.count["msgs"]),
+            round(t1 - t0, 2),
         )
     )
 
